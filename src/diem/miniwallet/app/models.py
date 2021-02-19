@@ -14,6 +14,10 @@ T = TypeVar("T", bound="Base")
 class Base:
     id: str
 
+    @classmethod
+    def resource_name(cls) -> str:
+        return utils.to_snake(cls)
+
 
 @dataclass
 class Account(Base):
@@ -24,7 +28,11 @@ class Account(Base):
 
 
 @dataclass
-class ReceivePayment(Base):
+class PaymentURI(Base):
+    @classmethod
+    def resource_name(cls) -> str:
+        return "payment_uri"
+
     account_id: str
     subaddress_hex: str = field(metadata={"readonly": True})
     account_identifier: str = field(metadata={"readonly": True})

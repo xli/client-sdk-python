@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass, field, replace, fields
 from typing import List, Type, Optional, Any
-from .app import T, Account, ReceivePayment, Transaction, KycSamples
+from .app import T, Account, PaymentURI, Transaction, KycSamples
 from .. import utils, offchain
 import json, requests, logging, random, string
 
@@ -53,14 +53,14 @@ class RestClient:
         raise ValueError("expect one, but found %s by %s" % (ret, kwargs))
 
     def get_all(self, typ: Type[T], **kwargs) -> List[T]:  # pyre-ignore
-        resp = self.send("GET", "/%ss" % utils.to_snake(typ))
+        resp = self.send("GET", "/%ss" % typ.resource_name())
         ret = [typ(**obj) for obj in list(resp)]
         for k, v in kwargs.items():
             ret = list(filter(lambda r: getattr(r, k) == v, ret))
         return ret
 
     def create(self, typ: Type[T], **kwargs) -> T:  # pyre-ignore
-        return typ(**self.send("POST", "/%ss" % utils.to_snake(typ), json.dumps(kwargs)))
+        return typ(**self.send("POST", "/%ss" % typ.resource_name(), json.dumps(kwargs)))
 
     def sync(self) -> None:
         self.send("POST", "/sync")
@@ -97,8 +97,8 @@ class AccountResource:
     def send_payment(self, currency: str, amount: int, payee: str) -> Transaction:
         return self.client.create(Transaction, account_id=self.id, payee=payee, currency=currency, amount=amount)
 
-    def create_receive_payment(self) -> ReceivePayment:
-        return self.client.create(ReceivePayment, account_id=self.id)
+    def create_payment_uri(self) -> PaymentURI:
+        return self.client.create(PaymentURI, account_id=self.id)
 
     def balance(self, currency: str) -> int:
         txns = self.get_all(Transaction, currency=currency)

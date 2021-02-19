@@ -4,7 +4,7 @@
 from dataclasses import dataclass, asdict
 from typing import Type, Generic
 from .app import App
-from .models import T, Account, ReceivePayment, Transaction, Command
+from .models import T, Account, PaymentURI, Transaction, Command
 from .json_input import JsonInput
 from ... import offchain, utils
 import falcon, json, traceback, logging
@@ -68,7 +68,7 @@ class Kyc:
 
 def falcon_api(app: App, stub: bool = False) -> falcon.API:
     api = falcon.API()
-    for typ in [Account, Transaction, ReceivePayment]:
+    for typ in [Account, Transaction, PaymentURI]:
         add_resource_route(api, app, typ)
     api.add_route("/v2/command", OffChain(app))
     api.add_route("/sync", Sync(app))
@@ -79,4 +79,4 @@ def falcon_api(app: App, stub: bool = False) -> falcon.API:
 
 
 def add_resource_route(api: falcon.API, app: App, typ: Type[T]) -> None:
-    api.add_route("/%ss" % utils.to_snake(typ), Resources(app, typ))
+    api.add_route("/%ss" % typ.resource_name(), Resources(app, typ))

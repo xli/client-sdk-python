@@ -28,7 +28,7 @@ class InMemory:
             return ret[0]
         elif last and ret:
             return ret[-1]
-        raise NotFoundError("%s not found by %s in %s" % (utils.to_snake(typ), conditions, self._table(typ)))
+        raise NotFoundError("%s not found by %s in %s" % (typ.resource_name(), conditions, self._table(typ)))
 
     def create(self, typ: Type[T], before_create: Callable[[T], None] = lambda _: None, **data) -> T:  # pyre-ignore
         obj = typ(id=self.next_id(), **data)

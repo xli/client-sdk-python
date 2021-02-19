@@ -20,8 +20,8 @@ def test_payment_test_data_generator(currency, clients):
         for receiver_kyc in data_types:
             sender = clients.app.create_account(currency, amount, kyc_data=getattr(clients.stub, sender_kyc)())
             stub_receiver = clients.stub.create_account(kyc_data=getattr(clients.app, receiver_kyc)())
-            receive_payment = stub_receiver.create_receive_payment()
-            send_payment = sender.send_payment(currency, amount, receive_payment.account_identifier)
+            payment_uri = stub_receiver.create_payment_uri()
+            send_payment = sender.send_payment(currency, amount, payment_uri.account_identifier)
 
             clients.wait_for(lambda: clients.app.reload(send_payment).status in ["completed", "canceled"])
             ret.append(("travel_rule", sender_kyc, receiver_kyc, command_states(stub_receiver)))
@@ -113,11 +113,11 @@ def test_payment(
     sender_initial = sender.balance(currency)
     receiver_initial = receiver.balance(currency)
 
-    receive_payment = receiver.create_receive_payment()
-    send_payment = sender.send_payment(currency, amount, receive_payment.account_identifier)
+    payment_uri = receiver.create_payment_uri()
+    send_payment = sender.send_payment(currency, amount, payment_uri.account_identifier)
     assert send_payment.currency == currency
     assert send_payment.amount == amount
-    assert send_payment.payee == receive_payment.account_identifier
+    assert send_payment.payee == payment_uri.account_identifier
     clients.wait_for(lambda: sender.client.reload(send_payment).subaddress_hex)
 
     if exchange_states:

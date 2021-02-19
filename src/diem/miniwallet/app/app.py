@@ -5,7 +5,7 @@ from typing import Type, List, Tuple, cast
 from json.decoder import JSONDecodeError
 from .store import InMemory, NotFoundError
 from .diem_account import DiemAccount
-from .models import T, ReceivePayment, Account, Transaction, Command, KycSamples
+from .models import T, PaymentURI, Account, Transaction, Command, KycSamples
 from .event_puller import EventPuller
 from .json_input import JsonInput
 from ... import jsonrpc, offchain, utils, LocalAccount
@@ -105,7 +105,7 @@ class OffChainAPI(Base):
         except NotFoundError:
             payment_command = None
             subaddress = utils.hex(new_cmd.my_subaddress(self.diem.account.hrp))
-            account_id = self.store.find(ReceivePayment, subaddress_hex=subaddress).account_id
+            account_id = self.store.find(PaymentURI, subaddress_hex=subaddress).account_id
 
         if new_cmd != payment_command:
             new_cmd.validate(payment_command)
@@ -178,7 +178,7 @@ class App(OffChainAPI):
 
     def create_resource(self, typ: Type[T], data: JsonInput) -> T:
         with self.store.transaction:
-            return getattr(self, "_create_resource_%s" % utils.to_snake(typ))(data)
+            return getattr(self, "_create_resource_%s" % typ.resource_name())(data)
 
     def _create_resource_account(self, data: JsonInput) -> Account:
         return self.store.create(
@@ -199,10 +199,10 @@ class App(OffChainAPI):
             before_create=self._validate_account_balance,
         )
 
-    def _create_resource_receive_payment(self, data: JsonInput) -> ReceivePayment:
+    def _create_resource_payment_uri(self, data: JsonInput) -> PaymentURI:
         subaddress = self._gen_subaddress()
         return self.store.create(
-            ReceivePayment,
+            PaymentURI,
             account_id=self.store.find(Account, id=data.get("account_id", str)).id,
             subaddress_hex=subaddress.hex(),
             account_identifier=self.diem.account.account_identifier(subaddress),
@@ -221,7 +221,7 @@ class App(OffChainAPI):
 
     def _send_internal_payment_txn(self, txn: Transaction) -> None:
         _, payee_subaddress = self.diem.account.decode_account_identifier(str(txn.payee))
-        rp = self.store.find(ReceivePayment, subaddress_hex=utils.hex(payee_subaddress))
+        rp = self.store.find(PaymentURI, subaddress_hex=utils.hex(payee_subaddress))
         self.store.create(
             Transaction, account_id=rp.account_id, currency=txn.currency, amount=txn.amount, status="completed"
         )
