@@ -1,0 +1,28 @@
+Todo:
+* PaymentCommand model instead of general command?
+* handle refund with: RefundMetadataV0
+* invalid payment command test cases
+* test offchain api invalid subaddress
+* test wont resubmit txn?
+
+----------done----------
+* setup kyc data all fields
+* how to setup test app account? configure api?  call create_receive_payment to get onchain address
+
+* txn account_id should be optional ????????? or fail fast?: fail fast, in proxy call it can also fail instead of creating non account id txn
+* validate account balance
+
+* validate total account balances?? -- no need for now
+* validate server set values not provided?  -- reject
+
+
+---ignore for now
+* add more transaction status to represent offchain command status / actions?
+* ReceivePayment generate intent identifier?
+* store raw_transaction?
+* describe type validation at model?
+* test for create transaction account balance in parallel, account balance should always >=0?
+
+
+---next step:
+* add diem id support?

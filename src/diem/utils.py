@@ -17,6 +17,7 @@ DIEM_HASH_PREFIX: bytes = b"DIEM::"
 ROOT_ADDRESS: str = "0000000000000000000000000a550c18"
 TREASURY_ADDRESS: str = "0000000000000000000000000b1e55ed"
 CORE_CODE_ADDRESS: str = "00000000000000000000000000000001"
+AccountAddressType = typing.Union[diem_types.AccountAddress, bytes, str]
 
 
 class InvalidAccountAddressError(Exception):
@@ -27,7 +28,7 @@ class InvalidSubAddressError(Exception):
     pass
 
 
-def account_address(addr: typing.Union[diem_types.AccountAddress, bytes, str]) -> diem_types.AccountAddress:
+def account_address(addr: AccountAddressType) -> diem_types.AccountAddress:
     """convert an account address from hex-encoded or bytes into `diem_types.AccountAddress`
 
     Returns given address if it is `diem_types.AccountAddress` already
@@ -76,6 +77,12 @@ def sub_address(addr: typing.Union[str, bytes]) -> bytes:
             f"{addr}(len={len(ret)}) is a valid sub-address, sub-address is {SUB_ADDRESS_LEN} bytes"
         )
     return ret
+
+
+def hex(b: typing.Optional[bytes]) -> str:
+    """convert an optional bytes into hex-encoded str, returns "" if bytes is None"""
+
+    return b.hex() if b else ""
 
 
 def public_key_bytes(public_key: Ed25519PublicKey) -> bytes:
@@ -172,3 +179,11 @@ def balance(account: jsonrpc.Account, currency: str) -> int:
         if b.currency == currency:
             return b.amount
     return 0
+
+
+def to_snake(o: typing.Any) -> str:  # pyre-ignore
+    if isinstance(o, str):
+        return "".join(["_" + i.lower() if i.isupper() else i for i in o]).lstrip("_")
+    elif hasattr(o, "__name__"):
+        return to_snake(getattr(o, "__name__"))
+    return to_snake(type(o))

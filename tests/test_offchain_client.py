@@ -20,7 +20,7 @@ def test_send_and_deserialize_request(factory):
     offchain.http_server.start_local(receiver_port, process_inbound_request)
 
     payment = factory.new_payment_object(sender, receiver)
-    command = offchain.PaymentCommand(payment=payment, my_actor_address=payment.sender.address, inbound=False)
+    command = offchain.PaymentCommand(payment=payment, my_actor_address=payment.sender.address)
     resp = sender_client.send_command(command, sender.compliance_key.sign)
     assert resp
 

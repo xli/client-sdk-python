@@ -56,4 +56,4 @@ class Factory:
 
     def new_sender_payment_command(self):
         payment = self.new_payment_object()
-        return offchain.PaymentCommand(my_actor_address=payment.sender.address, payment=payment, inbound=False)
+        return offchain.PaymentCommand(my_actor_address=payment.sender.address, payment=payment)

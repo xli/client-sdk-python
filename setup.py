@@ -23,11 +23,7 @@ setup(
     package_dir={"": "src"},
     include_package_data=True,  # see MANIFEST.in
     zip_safe=True,
-    install_requires=["requests>=2.20.0", "cryptography>=2.8", "numpy>=1.18", "protobuf>=3.12.4"],
-    setup_requires=[
-        # Setuptools 18.0 properly handles Cython extensions.
-        "setuptools>=18.0",
-    ],
+    install_requires=["requests>=2.20.0", "cryptography>=2.8", "numpy>=1.18", "protobuf>=3.12.4", "falcon>=2.0.0", "waitress>=1.4.4"],
     classifiers=[
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',

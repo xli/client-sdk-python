@@ -18,10 +18,10 @@ lint:
 format:
 	./venv/bin/python -m black src tests examples
 
-test: format lint runtest
+test: format runtest
 
 runtest:
-	./venv/bin/pytest tests/test_* examples/* -k "$(t)" $(args)
+	./venv/bin/pytest tests examples -k "$(t)" $(args)
 
 cover:
 	./venv/bin/pytest --cov-report html --cov=src tests/test_* examples/*
@@ -77,4 +77,7 @@ docker-down:
 docker-stop:
 	docker-compose -f docker/testnet/docker-compose.yaml stop
 
-.PHONY: init lint format test cover build diemtypes protobuf gen dist docs server docker docker-down docker-stop
+clean:
+	rm -rf .test-config.*
+
+.PHONY: init lint format test cover build diemtypes protobuf gen dist docs server docker docker-down docker-stop clean

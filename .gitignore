@@ -7,3 +7,4 @@ __pycache__
 
 # JetBrains IDEs configuration
 .idea
+.test-config.*
