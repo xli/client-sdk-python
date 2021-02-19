@@ -6,7 +6,7 @@ from typing import Type, Generic
 from .app import App
 from .models import T, Account, PaymentURI, Transaction, Command
 from .json_input import JsonInput
-from ... import offchain, utils
+from ... import offchain
 import falcon, json, traceback, logging
 
 

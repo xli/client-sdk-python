@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from threading import Lock
 from typing import List, Dict, Type, Callable
 from .models import T
-from ... import utils
 
 
 class NotFoundError(ValueError):

@@ -4,7 +4,7 @@
 from dataclasses import dataclass, field, replace, fields
 from typing import List, Type, Optional, Any
 from .app import T, Account, PaymentURI, Transaction, KycSamples
-from .. import utils, offchain
+from .. import offchain
 import json, requests, logging, random, string
 
 
