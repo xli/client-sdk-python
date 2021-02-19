@@ -142,7 +142,7 @@ class WalletApp:
 
             inbound_command = self.offchain_client.process_inbound_request(request_sender_address, request_bytes)
             cid = inbound_command.id()
-            self.save_command(inbound_command)
+            self.save_command(inbound_command, is_inbound=True)
             resp = offchain.reply_request(cid)
             code = 200
         except offchain.Error as e:
@@ -298,7 +298,7 @@ class WalletApp:
 
     # ---------------------- commands ---------------------------
 
-    def save_command(self, command: offchain.Command) -> None:
+    def save_command(self, command: offchain.Command, is_inbound: bool = False) -> None:
         """save command locks prior command by reference id, validate and save new command.
 
         in a production implementation, the lock should be database / distributed lock to ensure
@@ -311,12 +311,13 @@ class WalletApp:
             raise offchain.command_error(offchain.ErrorCode.conflict, msg)
 
         try:
-            prior = self.saved_commands.get(command.reference_id())
-            if command == prior:
-                return
-            command.validate(prior)
+            if is_inbound:
+                prior = self.saved_commands.get(command.reference_id())
+                if command == prior:
+                    return
+                command.validate(prior)
             self.saved_commands[command.reference_id()] = command
-            if command.is_inbound():
+            if is_inbound:
                 self._enqueue_follow_up_action(command)
             else:  # outbound
                 self.task_queue.append(lambda app: app._send_request(command))

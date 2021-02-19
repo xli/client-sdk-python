@@ -15,10 +15,6 @@ class Command(ABC):
         ...
 
     @abstractmethod
-    def is_inbound(self) -> bool:
-        ...
-
-    @abstractmethod
     def follow_up_action(self) -> typing.Optional[Action]:
         ...
 

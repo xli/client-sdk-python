@@ -28,7 +28,6 @@ from .. import diem_types, identifier, txnmetadata
 class PaymentCommand(Command):
     my_actor_address: str
     payment: PaymentObject
-    inbound: bool
     cid: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
 
     @staticmethod
@@ -40,7 +39,6 @@ class PaymentCommand(Command):
         currency: str,
         original_payment_reference_id: typing.Optional[str] = None,
         description: typing.Optional[str] = None,
-        inbound: bool = False,
     ) -> "PaymentCommand":
         return PaymentCommand(
             my_actor_address=sender_account_id,
@@ -53,14 +51,10 @@ class PaymentCommand(Command):
                 original_payment_reference_id=original_payment_reference_id,
                 description=description,
             ),
-            inbound=inbound,
         )
 
     def id(self) -> str:
         return self.cid
-
-    def is_inbound(self) -> bool:
-        return self.inbound
 
     def reference_id(self) -> str:
         return self.payment.reference_id
@@ -92,14 +86,17 @@ class PaymentCommand(Command):
 
     # the followings are PaymentCommand specific methods
 
+    def my_subaddress(self, hrp: str) -> typing.Optional[bytes]:
+        return identifier.decode_account_subaddress(self.my_actor_address, hrp)
+
     def validate_state_trigger_actor(self) -> None:
-        if self.inbound and self.opponent_actor() != self.state_trigger_actor():
+        if self.opponent_actor() != self.state_trigger_actor():
             raise command_error(
                 ErrorCode.invalid_command_producer, f"{self.opponent_actor()} should not produce {self}"
             )
 
     def validate_actor_object(self, prior: "PaymentCommand") -> None:
-        if self.inbound and self.my_actor_obj() != prior.my_actor_obj():
+        if self.my_actor_obj() != prior.my_actor_obj():
             raise InvalidOverwriteError(
                 f"payment.{self.my_actor_field_name()}",
                 self.my_actor_obj(),
@@ -129,7 +126,6 @@ class PaymentCommand(Command):
         additional_kyc_data: typing.Optional[str] = None,
         abort_code: typing.Optional[str] = None,
         abort_message: typing.Optional[str] = None,
-        inbound: bool = False,
         metadata: typing.Optional[typing.List[str]] = None,
     ) -> Command:
         changes: typing.Dict[str, typing.Any] = {
@@ -146,7 +142,7 @@ class PaymentCommand(Command):
         if recipient_signature:
             changes["recipient_signature"] = recipient_signature
         new_payment = dataclasses.replace(self.payment, **changes)
-        return PaymentCommand(my_actor_address=self.my_actor_address, payment=new_payment, inbound=inbound)
+        return PaymentCommand(my_actor_address=self.my_actor_address, payment=new_payment)
 
     def is_sender(self) -> bool:
         return self.payment.sender.address == self.my_actor_address
