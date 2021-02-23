@@ -18,10 +18,13 @@ lint:
 format:
 	./venv/bin/python -m black src tests examples
 
-test: format lint runtest
+test: format runtest
 
 runtest:
-	./venv/bin/pytest tests/test_* examples/* -k "$(t)" $(args)
+	./venv/bin/pytest tests examples -k "$(t)" $(args)
+
+profile:
+	./venv/bin/python -m profile -m pytest tests examples -k "$(t)" $(args)
 
 cover:
 	./venv/bin/pytest --cov-report html --cov=src tests/test_* examples/*

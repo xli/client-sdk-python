@@ -92,6 +92,9 @@ class PaymentCommand(Command):
 
     # the followings are PaymentCommand specific methods
 
+    def my_subaddress(self, hrp: str) -> typing.Optional[bytes]:
+        return identifier.decode_account_subaddress(self.my_actor_address, hrp)
+
     def validate_state_trigger_actor(self) -> None:
         if self.inbound and self.opponent_actor() != self.state_trigger_actor():
             raise command_error(
@@ -188,6 +191,9 @@ class PaymentCommand(Command):
 
     def is_rsend(self) -> bool:
         return R_SEND == self.state()
+
+    def is_final(self) -> bool:
+        return self.is_abort() or self.is_both_ready()
 
     def is_both_ready(self) -> bool:
         return (
