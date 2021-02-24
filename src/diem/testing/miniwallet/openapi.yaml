@@ -81,8 +81,8 @@ paths:
           $ref: '#/components/responses/ClientError'
   /accounts/{account_id}/payment_uris:
     post:
-      operationId: payment-uri
-      summary: Create a payment URI for receiving funds
+      operationId: gen-payment-uri
+      summary: generate a payment URI for receiving funds
       parameters:
       - name: account_id
         in: path
