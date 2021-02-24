@@ -3,9 +3,9 @@
 
 
 from dataclasses import dataclass, field
-from diem import jsonrpc, testnet, LocalAccount
+from diem import jsonrpc, testnet
 from diem.testing.miniwallet import RestClient, AppConfig
-import pytest, time
+import pytest
 
 
 @dataclass
@@ -19,12 +19,12 @@ class Config:
         return jsonrpc.Client(self.jsonrpc_url)
 
     def start_servers(self, client: jsonrpc.Client) -> None:
-        self.app.serve(self.app.create_api(client))
-        self.stub.serve(self.stub.create_api(client))
+        self.app.serve(client)
+        self.stub.serve(client)
 
     def setup_accounts(self, client: jsonrpc.Client) -> None:
-        for app in [self.app, self.stub]:
-            app.setup_account(client)
+        self.app.setup_account(client)
+        self.stub.setup_account(client)
 
 
 @dataclass
@@ -32,18 +32,6 @@ class Clients:
     app: RestClient
     stub: RestClient
     diem: jsonrpc.Client
-
-    def wait_for(self, fn, tries=100, delay=0.01):
-        for _ in range(tries):
-            self.app.sync()
-            self.stub.sync()
-            try:
-                ret = fn()
-                if ret:
-                    return ret
-            except ValueError:
-                time.sleep(delay)
-        raise TimeoutError("waited %s secs after %s tries" % (tries * delay, tries))
 
 
 @pytest.fixture(scope="package")
@@ -65,21 +53,15 @@ def clients(config: Config) -> Clients:
 
 
 @pytest.fixture
-def currency() -> str:
-    return "XUS"
-
-
-@pytest.fixture
-def travel_rule_threshold(currency, clients) -> int:
-    # todo: convert the limit base on currency
+def travel_rule_threshold(clients) -> int:
     return clients.diem.get_metadata().dual_attestation_limit
 
 
 @pytest.fixture
-def hrp(config: Config) -> str:
-    return config.stub.account.hrp
+def hrp() -> str:
+    return testnet.HRP
 
 
 @pytest.fixture
-def stub_app_account(config: Config) -> LocalAccount:
-    return config.stub.account
+def currency() -> str:
+    return testnet.TEST_CURRENCY_CODE

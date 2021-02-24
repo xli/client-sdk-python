@@ -23,10 +23,10 @@ setup(
     license="Apache-2.0",
     url="https://github.com/diem/client-sdk-python",
     # author="Diem Open Source",
-    py_modules=["bin.dmw"],
+    py_modules=["diem.testing.cli.click"],
     entry_points='''
         [console_scripts]
-        dmw=bin.dmw:main
+        dmw=diem.testing.cli.click:main
     ''',
     python_requires=">=3.7", # requires dataclasses
     packages=["diem"],

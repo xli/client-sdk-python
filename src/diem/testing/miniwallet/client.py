@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from dataclasses import dataclass, field, replace
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 from typing import List, Optional, Any, Dict, Callable
 from .app import PaymentUri, KycSample, Event, Payment
 from .app.store import _match
@@ -16,6 +18,10 @@ logger: logging.Logger = logging.getLogger(__name__)
 class RestClient:
     server_url: str
     session: requests.Session = field(default_factory=requests.Session)
+
+    def with_retry(self, retry: Retry = Retry(total=5, connect=5, backoff_factor=0.1)) -> "RestClient":
+        self.session.mount(self.server_url, HTTPAdapter(max_retries=retry))
+        return self
 
     def create_account(self, balances: Dict[str, int] = {}, kyc_data: Optional[str] = None) -> "AccountResource":
         account = self.create("/accounts", kyc_data=kyc_data or self.new_kyc_data(), balances=balances)

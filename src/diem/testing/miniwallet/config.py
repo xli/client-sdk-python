@@ -3,12 +3,10 @@
 
 from dataclasses import dataclass, field
 from typing import Dict, Any
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
 from .client import RestClient
 from .app import App, falcon_api
 from ... import offchain, testnet, jsonrpc, LocalAccount
-import waitress, threading, logging, requests, falcon
+import waitress, threading, logging, falcon
 
 
 @dataclass
@@ -35,9 +33,7 @@ class AppConfig:
         return "%s://%s:%s" % (self.url_scheme, self.host, self.port)
 
     def create_client(self) -> RestClient:
-        session = requests.Session()
-        session.mount(self.server_url, HTTPAdapter(max_retries=Retry(total=5, connect=5, backoff_factor=0.1)))
-        return RestClient(server_url=self.server_url, session=session)
+        return RestClient(server_url=self.server_url).with_retry()
 
     def setup_account(self, client: jsonrpc.Client) -> None:
         acc = client.get_account(self.account.account_address)
@@ -67,17 +63,13 @@ class AppConfig:
     def create_api(self, client: jsonrpc.Client) -> falcon.API:
         return falcon_api(App(self.account, client, self.name, self.logger))
 
-    def serve(self, api: falcon.API) -> threading.Thread:
-        t = threading.Thread(
-            target=waitress.serve,
-            args=[api],
-            kwargs={
-                "host": self.host,
-                "port": self.port,
-                "clear_untrusted_proxy_headers": True,
-                "_quiet": True,
-            },
-            daemon=True,
-        )
+    def serve(self, client: jsonrpc.Client) -> threading.Thread:
+        return self.serve_api(self.create_api(client))
+
+    def serve_api(self, api: falcon.API) -> threading.Thread:
+        def serve() -> None:
+            waitress.serve(api, host=self.host, port=self.port, clear_untrusted_proxy_headers=True, _quiet=True)
+
+        t = threading.Thread(target=serve, daemon=True)
         t.start()
         return t
