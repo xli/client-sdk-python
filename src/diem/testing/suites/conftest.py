@@ -28,6 +28,11 @@ def clients(stub_config: AppConfig) -> Clients:
     )
 
 
+@pytest.fixture(scope="package")
+def target_client(clients: Clients) -> RestClient:
+    return clients.target
+
+
 @pytest.fixture
 def hrp() -> str:
     return testnet.HRP

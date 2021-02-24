@@ -58,7 +58,7 @@ def test(target: str, jsonrpc: str, faucet: str, pytest_args: str) -> None:
     configure_testnet(jsonrpc, faucet)
     os.environ[envs.TARGET_URL] = target
 
-    args = ["--pyargs", "diem.testing.suites"] + re.compile("\s+").split(pytest_args)
+    args = ["--pyargs", "diem.testing.suites"] + [arg for arg in re.compile("\s+").split(pytest_args) if arg]
     print("pytest arguments: %s" % args)
     code = pytest.main(args)
     sys.stdout.flush()

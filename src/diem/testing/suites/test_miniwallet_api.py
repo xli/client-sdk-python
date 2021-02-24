@@ -3,23 +3,27 @@
 
 from diem.testing.miniwallet import Account, Transaction
 from diem import identifier
-import pytest, requests, time, json
+from .envs import INCLUDE_DEBUG_API
+import pytest, requests, time, json, os
 
 
-def test_account_resource_create_with_kyc_data_and_balances(clients, currency):
-    client = clients.stub
-    kyc_data = client.new_kyc_data()
-    account = client.create_account(kyc_data=kyc_data, balances={currency: 100})
+def test_create_account_resource_without_balance(target_client):
+    account = target_client.create_account()
+    assert account.balances() == {}
+
+
+def test_create_account_with_kyc_data_and_balances(target_client, currency):
+    kyc_data = target_client.new_kyc_data()
+    account = target_client.create_account(kyc_data=kyc_data, balances={currency: 100})
     assert account.id
     assert account.kyc_data == kyc_data
     assert account.balances() == {currency: 100}
     assert account.balance(currency) == 100
 
-
-def test_account_resource_creation_event(clients, currency):
-    client = clients.stub
+@pytest.mark.skipif(os.getenv(INCLUDE_DEBUG_API), reason="env variable %r is not set" % INCLUDE_DEBUG_API)
+def test_create_account_event(target_client, currency):
     before_timestamp = int(time.time() * 1000)
-    account = client.create_account()
+    account = target_client.create_account()
     after_timestamp = int(time.time() * 1000)
 
     events = account.events()
@@ -34,11 +38,6 @@ def test_account_resource_creation_event(clients, currency):
     assert event_data.id == account.id
 
 
-def test_account_resource_create_without_balance(clients):
-    account = clients.app.create_account()
-    assert account.balances() == {}
-
-
 @pytest.mark.parametrize(
     "err_msg, kyc_data, balances",
     [
@@ -51,19 +50,17 @@ def test_account_resource_create_without_balance(clients):
         ("'amount' type must be 'int'", "sample", {"XUS": "11"}),
     ],
 )
-def test_account_resource_creation_errors(clients, currency, err_msg, kyc_data, balances):
-    client = clients.stub
+def test_create_account_with_invalid_data(target_client, currency, err_msg, kyc_data, balances):
     if kyc_data == "sample":
-        kyc_data = client.new_kyc_data()
+        kyc_data = target_client.new_kyc_data()
 
     with pytest.raises(requests.exceptions.HTTPError, match="400 Client Error") as einfo:
-        client.create("/accounts", kyc_data=kyc_data, balances=balances)
+        target_client.create("/accounts", kyc_data=kyc_data, balances=balances)
     assert err_msg in einfo.value.response.text
 
 
-def test_payment_uri_resource(clients, hrp):
-    account = clients.stub.create_account()
-    assert len(account.events()) == 1
+def test_create_account_payment_uri(target_client, hrp):
+    account = target_client.create_account()
     ret = account.create_payment_uri()
     assert ret.account_id == account.id
     assert ret.subaddress_hex
@@ -72,12 +69,17 @@ def test_payment_uri_resource(clients, hrp):
     assert address
     assert subaddress
     assert ret.subaddress_hex == subaddress.hex()
-    assert len(account.events()) == 2
-    assert account.events()[1].type == "created_payment_uri"
 
+@pytest.mark.skipif(os.getenv(INCLUDE_DEBUG_API), reason="env variable %r is not set" % INCLUDE_DEBUG_API)
+def test_create_account_payment_uri_events(target_client, hrp):
+    account = target_client.create_account()
+    index = len(account.events())
+    ret = account.create_payment_uri()
+    assert len(account.events(index)) == 1
+    assert account.events(index)[0].type == "created_payment_uri"
 
 def test_send_payment_and_events(clients, hrp, currency):
-    receiver = clients.app.create_account()
+    receiver = clients.target.create_account()
     payment_uri = receiver.create_payment_uri()
 
     amount = 1234
@@ -112,7 +114,7 @@ def test_receive_payment_and_events(clients, hrp, currency):
 
     index = len(receiver.events())
     amount = 1234
-    sender = clients.app.create_account({currency: amount})
+    sender = clients.target.create_account({currency: amount})
     payment = sender.send_payment(currency, amount, payment_uri.intent(hrp).account_id)
 
     receiver.wait_for_balance(currency, amount)
@@ -134,10 +136,10 @@ def test_receive_multiple_payments(clients, hrp, currency):
 
     index = len(receiver.events())
     amount = 1234
-    sender1 = clients.app.create_account({currency: amount})
+    sender1 = clients.target.create_account({currency: amount})
     sender1.send_payment(currency, amount, payment_uri.intent(hrp).account_id)
 
-    sender2 = clients.app.create_account({currency: amount})
+    sender2 = clients.target.create_account({currency: amount})
     sender2.send_payment(currency, amount, payment_uri.intent(hrp).account_id)
 
     sender1.wait_for_balance(currency, 0)
@@ -170,7 +172,7 @@ def test_send_payment_payee_is_invalid(clients, currency, invalid_payee, hrp):
 
 
 def test_return_client_error_if_send_payment_more_than_account_balance(clients, currency, hrp):
-    receiver = clients.app.create_account()
+    receiver = clients.target.create_account()
     payment_uri = receiver.create_payment_uri()
     sender = clients.stub.create_account({currency: 100})
 
@@ -184,7 +186,7 @@ def test_return_client_error_if_send_payment_more_than_account_balance(clients, 
 
 def test_send_payment_meets_travel_rule_limit(clients, currency, travel_rule_threshold, hrp):
     amount = travel_rule_threshold
-    receiver = clients.app.create_account()
+    receiver = clients.target.create_account()
     payment_uri = receiver.create_payment_uri()
     sender = clients.stub.create_account({currency: amount}, kyc_data=clients.stub.new_kyc_data())
     payment = sender.send_payment(currency, amount, payee=payment_uri.intent(hrp).account_id)
@@ -196,9 +198,9 @@ def test_send_payment_meets_travel_rule_limit(clients, currency, travel_rule_thr
 
 def test_account_balance_validation_should_exclude_canceled_transactions(clients, currency, travel_rule_threshold, hrp):
     amount = travel_rule_threshold
-    receiver = clients.app.create_account()
+    receiver = clients.target.create_account()
     payment_uri = receiver.create_payment_uri()
-    sender = clients.stub.create_account({currency: amount}, kyc_data=clients.app.new_reject_kyc_data())
+    sender = clients.stub.create_account({currency: amount}, kyc_data=clients.target.new_reject_kyc_data())
     # payment should be rejected during offchain kyc data exchange
     payment = sender.send_payment(currency, amount, payee=payment_uri.intent(hrp).account_id)
 
