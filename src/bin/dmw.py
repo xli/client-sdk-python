@@ -5,7 +5,7 @@
 
 from dataclasses import asdict
 from diem import testnet
-from diem.testing.miniwallet import AppConfig, App, falcon_api
+from diem.testing.miniwallet import AppConfig
 from pathlib import Path
 import json, logging, click, falcon
 
@@ -23,9 +23,8 @@ def main() -> None:
 @click.option("--jsonrpc", "-j", default="http://localhost:8080/v1", help="Diem fullnode JSON-RPC URL.")
 @click.option("--faucet", "-f", default="http://localhost:8000/mint", help="Testnet faucet URL.")
 @click.option("--name", "-n", default="mini-wallet", help="Testnet faucet URL.")
-def start_server(port: int, jsonrpc: str, faucet: str, name: str) -> None:
-    conf = AppConfig()
-    conf.port = port
+def start_server(name: str, port: int, jsonrpc: str, faucet: str) -> None:
+    conf = AppConfig(name=name, port=port)
     testnet.JSON_RPC_URL = jsonrpc
     testnet.FAUCET_URL = faucet
 
@@ -37,7 +36,7 @@ def start_server(port: int, jsonrpc: str, faucet: str, name: str) -> None:
     print("setting up Diem account for server")
     conf.setup_account(client)
 
-    api: falcon.API = falcon_api(App(conf.account, client, name))
+    api: falcon.API = conf.create_api(client)
 
     def openapi(req, resp) -> None:  # pyre-ignore
         resp.content_type = "application/yaml"
@@ -45,7 +44,7 @@ def start_server(port: int, jsonrpc: str, faucet: str, name: str) -> None:
 
     api.add_sink(openapi, prefix="/openapi.yaml")
 
-    print("starting server %s on %s" % (name, conf.port))
+    print("%s starting server on %s" % (name, conf.port))
     conf.serve(api).join()
 
 

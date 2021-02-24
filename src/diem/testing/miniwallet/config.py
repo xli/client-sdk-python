@@ -6,16 +6,14 @@ from typing import Dict, Any
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from .client import RestClient
+from .app import App, falcon_api
 from ... import offchain, testnet, jsonrpc, LocalAccount
-
 import waitress, threading, logging, requests, falcon
-
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass
 class AppConfig:
+    name: str = field(default="mini-wallet")
     url_scheme: str = field(default="http")
     host: str = field(default="localhost")
     port: int = field(default_factory=offchain.http_server.get_available_port)
@@ -23,6 +21,10 @@ class AppConfig:
 
     initial_amount: int = field(default=1_000_000_000_000)
     initial_currency: str = field(default=testnet.TEST_CURRENCY_CODE)
+
+    @property
+    def logger(self) -> logging.Logger:
+        return logging.getLogger(self.name)
 
     @property
     def account(self) -> LocalAccount:
@@ -40,11 +42,11 @@ class AppConfig:
     def setup_account(self, client: jsonrpc.Client) -> None:
         acc = client.get_account(self.account.account_address)
         if not acc or self.need_funds(acc):
-            logger.info("faucet mint %s" % self.account.account_address.to_hex())
+            self.logger.info("faucet mint %s" % self.account.account_address.to_hex())
             faucet = testnet.Faucet(client)
             faucet.mint(self.account.auth_key.hex(), self.initial_amount, self.initial_currency)
         if not acc or self.need_rotate(acc):
-            logger.info("rotate dual attestation info for  %s" % self.account.account_address.to_hex())
+            self.logger.info("rotate dual attestation info for  %s" % self.account.account_address.to_hex())
             self.account.rotate_dual_attestation_info(client, self.server_url)
 
     def need_funds(self, account: jsonrpc.Account) -> bool:
@@ -61,6 +63,9 @@ class AppConfig:
         if bytes.fromhex(account.role.compliance_key) != self.account.compliance_public_key_bytes:
             return True
         return False
+
+    def create_api(self, client: jsonrpc.Client) -> falcon.API:
+        return falcon_api(App(self.account, client, self.name, self.logger))
 
     def serve(self, api: falcon.API) -> threading.Thread:
         t = threading.Thread(

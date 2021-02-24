@@ -4,7 +4,7 @@
 
 from dataclasses import dataclass, field
 from diem import jsonrpc, testnet, LocalAccount
-from diem.testing.miniwallet import RestClient, AppConfig, App, falcon_api
+from diem.testing.miniwallet import RestClient, AppConfig
 import pytest, time
 
 
@@ -12,15 +12,15 @@ import pytest, time
 class Config:
     jsonrpc_url: str = field(default_factory=lambda: testnet.JSON_RPC_URL)
 
-    app: AppConfig = field(default_factory=AppConfig)
-    stub: AppConfig = field(default_factory=AppConfig)
+    app: AppConfig = field(default_factory=lambda: AppConfig(name="app"))
+    stub: AppConfig = field(default_factory=lambda: AppConfig(name="stub"))
 
     def create_diem_client(self) -> jsonrpc.Client:
         return jsonrpc.Client(self.jsonrpc_url)
 
     def start_servers(self, client: jsonrpc.Client) -> None:
-        self.app.serve(falcon_api(App(self.app.account, client, "wallet")))
-        self.stub.serve(falcon_api(App(self.stub.account, client, "stub")))
+        self.app.serve(self.app.create_api(client))
+        self.stub.serve(self.stub.create_api(client))
 
     def setup_accounts(self, client: jsonrpc.Client) -> None:
         for app in [self.app, self.stub]:

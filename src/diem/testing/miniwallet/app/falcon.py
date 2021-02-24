@@ -25,7 +25,7 @@ def rest_handler(fn: Any):  # pyre-ignore
         try:
             try:
                 data = json.load(req.stream)
-                self.logger.info("body: %s" % data)
+                self.app.logger.info("request body: %s" % data)
             except Exception:
                 data = {}
             status, body = fn(self, input=JsonInput(data), **kwargs)
@@ -41,7 +41,6 @@ def rest_handler(fn: Any):  # pyre-ignore
 @dataclass
 class Endpoints:
     app: App
-    logger: logging.Logger
 
     @rest_handler
     def on_post_accounts(self, input: JsonInput) -> Tuple[str, Dict[str, str]]:
@@ -75,21 +74,20 @@ class Endpoints:
         try:
             resp_obj = self.app.offchain_api(request_sender_address, input_data)
         except offchain.Error as e:
-            self.logger.info(input_data)
-            self.logger.exception(e)
+            self.app.logger.info(input_data)
+            self.app.logger.exception(e)
             resp_obj = offchain.reply_request(cid=None, err=e.obj)
             resp.status = falcon.HTTP_400
         resp.body = self.app.jws_serialize(resp_obj)
 
 
 def falcon_api(app: App) -> falcon.API:
-    logger = logging.getLogger(app.name)
-    endpoints = Endpoints(app=app, logger=logger)
-    api = falcon.API(middleware=[LoggerMiddleware(logger=logger)])
+    endpoints = Endpoints(app=app)
+    api = falcon.API(middleware=[LoggerMiddleware(logger=app.logger)])
     api.add_route("/accounts", endpoints, suffix="accounts")
     for res in ["balances", "payments", "payment_uris", "events"]:
         api.add_route("/accounts/{account_id}/%s" % res, endpoints, suffix=res)
     api.add_route("/kyc_sample", endpoints, suffix="kyc_sample")
     api.add_route("/v2/command", endpoints, suffix="offchain")
-    app.start_sync(endpoints.logger)
+    app.start_sync()
     return api

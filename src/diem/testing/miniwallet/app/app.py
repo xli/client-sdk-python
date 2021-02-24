@@ -15,8 +15,8 @@ import threading, logging
 
 
 class Base:
-    def __init__(self, account: LocalAccount, client: jsonrpc.Client, name: str = "miniw") -> None:
-        self.name = name
+    def __init__(self, account: LocalAccount, client: jsonrpc.Client, name: str, logger: logging.Logger) -> None:
+        self.logger = logger
         self.diem_account = DiemAccount(account, client)
         self.store = InMemory()
         self.offchain = offchain.Client(account.account_address, client, account.hrp)
@@ -119,14 +119,14 @@ class OffChainAPI(Base):
 
 
 class BackgroundTasks(OffChainAPI):
-    def start_sync(self, logger: logging.Logger, delay: float = 0.1) -> None:
+    def start_sync(self, delay: float = 0.1) -> None:
         try:
             self._process_offchain_commands()
             self._send_pending_payments()
         except Exception as e:
-            logger.exception(e)
+            self.logger.exception(e)
         if threading.main_thread().is_alive():
-            threading.Timer(delay, self.start_sync, args=(logger, delay)).start()
+            threading.Timer(delay, self.start_sync, args=[delay]).start()
 
     def _send_pending_payments(self) -> None:
         for txn in self.store.find_all(Transaction, status=Transaction.Status.pending):
