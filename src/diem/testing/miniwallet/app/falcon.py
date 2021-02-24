@@ -1,7 +1,7 @@
 # Copyright (c) The Diem Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict
 from typing import Dict, List, Any, Tuple
 from .app import App
 from .json_input import JsonInput
@@ -9,10 +9,20 @@ from .... import offchain
 import falcon, json, traceback, logging
 
 
+@dataclass
+class LoggerMiddleware:
+    logger: logging.Logger
+
+    def process_request(self, req, resp):  # pyre-ignore
+        self.logger.info("%s %s" % (req.method, req.relative_uri))
+
+    def process_response(self, req, resp, *args, **kwargs):  # pyre-ignore
+        self.logger.info(resp.status)
+
+
 def rest_handler(fn: Any):  # pyre-ignore
     def wrapper(self, req, resp, **kwargs):  # pyre-ignore
         try:
-            self.logger.info("%s %s" % (req.method, req.path))
             try:
                 data = json.load(req.stream)
                 self.logger.info("body: %s" % data)
@@ -24,7 +34,6 @@ def rest_handler(fn: Any):  # pyre-ignore
         except ValueError as e:
             resp.status = falcon.HTTP_400
             resp.body = json.dumps({"error": str(e), "stacktrace": traceback.format_exc()})
-        self.logger.info(resp.status)
 
     return wrapper
 
@@ -32,10 +41,7 @@ def rest_handler(fn: Any):  # pyre-ignore
 @dataclass
 class Endpoints:
     app: App
-    logger: logging.Logger = field(init=False)
-
-    def __post_init__(self) -> None:
-        self.logger = logging.getLogger(self.app.name)
+    logger: logging.Logger
 
     @rest_handler
     def on_post_accounts(self, input: JsonInput) -> Tuple[str, Dict[str, str]]:
@@ -77,8 +83,9 @@ class Endpoints:
 
 
 def falcon_api(app: App) -> falcon.API:
-    endpoints = Endpoints(app)
-    api = falcon.API()
+    logger = logging.getLogger(app.name)
+    endpoints = Endpoints(app=app, logger=logger)
+    api = falcon.API(middleware=[LoggerMiddleware(logger=logger)])
     api.add_route("/accounts", endpoints, suffix="accounts")
     for res in ["balances", "payments", "payment_uris", "events"]:
         api.add_route("/accounts/{account_id}/%s" % res, endpoints, suffix=res)

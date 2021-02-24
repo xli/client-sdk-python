@@ -5,10 +5,12 @@
 
 from dataclasses import asdict
 from diem import testnet
-from diem.testing.miniwallet import AppConfig
-import json, logging, click
+from diem.testing.miniwallet import AppConfig, App, falcon_api
+from pathlib import Path
+import json, logging, click, falcon
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(name)s %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(name)s [%(asctime)s] %(levelname)s: %(message)s")
+basedir: Path = Path(__file__).resolve().parent
 
 
 @click.group()
@@ -34,8 +36,17 @@ def start_server(port: int, jsonrpc: str, faucet: str, name: str) -> None:
     print("Diem chain id: %s" % client.get_metadata().chain_id)
     print("setting up Diem account for server")
     conf.setup_account(client)
-    print("starting server %s" % name)
-    conf.serve(client, name).join()
+
+    api: falcon.API = falcon_api(App(conf.account, client, name))
+
+    def openapi(req, resp) -> None:  # pyre-ignore
+        resp.content_type = "application/yaml"
+        resp.body = basedir.joinpath("miniwallet.openapi.yaml").read_text()
+
+    api.add_sink(openapi, prefix="/openapi.yaml")
+
+    print("starting server %s on %s" % (name, conf.port))
+    conf.serve(api).join()
 
 
 main.add_command(start_server)  # pyre-ignore

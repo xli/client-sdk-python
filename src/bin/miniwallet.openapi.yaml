@@ -6,12 +6,11 @@ info:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   version: 0.0.1
-servers:
-- url: /
 paths:
   /accounts:
     post:
       summary: Add a new account with initial deposit balances
+      operationId: create-account
       requestBody:
         description: Account KYC data and initial deposit balances
         content:
@@ -30,6 +29,7 @@ paths:
           $ref: '#/components/responses/ClientError'
   /accounts/{account_id}/balances:
     get:
+      operationId: get-balances
       summary: Get account balances by account id
       parameters:
       - name: account_id
@@ -54,6 +54,7 @@ paths:
           $ref: '#/components/responses/ClientError'
   /accounts/{account_id}/payments:
     post:
+      operationId: send-payment
       summary: Send a payment to a payee
       parameters:
       - name: account_id
@@ -80,6 +81,7 @@ paths:
           $ref: '#/components/responses/ClientError'
   /accounts/{account_id}/payment_uris:
     post:
+      operationId: payment-uri
       summary: Create a payment URI for receiving funds
       parameters:
       - name: account_id
@@ -99,6 +101,7 @@ paths:
           $ref: '#/components/responses/ClientError'
   /accounts/{account_id}/events:
     get:
+      operationId: get-events
       summary: Get all events recorded for the account; this is optional debug endpoint.
       parameters:
       - name: account_id
@@ -120,6 +123,7 @@ paths:
           $ref: '#/components/responses/ClientError'
   /kyc_sample:
     get:
+      operationId: get-kyc-sample
       summary: returns KycSample data for creating test account.
       responses:
         200:
@@ -133,10 +137,6 @@ components:
     ClientError:
       description: Invalid input
       content:
-        text/plain:
-          schema:
-            type: string
-            example: error message and stacktrace
         application/json:
           schema:
             type: object
@@ -147,6 +147,10 @@ components:
               stacktrace:
                 type: string
                 description: stacktrace of the error
+        text/plain:
+          schema:
+            type: string
+            example: error message and stacktrace
   schemas:
     Account:
       required:

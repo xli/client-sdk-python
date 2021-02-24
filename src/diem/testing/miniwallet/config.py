@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from typing import Dict, Any
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-from .app import App, falcon_api
 from .client import RestClient
 from ... import offchain, testnet, jsonrpc, LocalAccount
 
@@ -40,13 +39,12 @@ class AppConfig:
 
     def setup_account(self, client: jsonrpc.Client) -> None:
         acc = client.get_account(self.account.account_address)
-        logger.info("account %s" % acc)
         if not acc or self.need_funds(acc):
-            logger.info("faucet mint %s" % self.account.account_address)
+            logger.info("faucet mint %s" % self.account.account_address.to_hex())
             faucet = testnet.Faucet(client)
             faucet.mint(self.account.auth_key.hex(), self.initial_amount, self.initial_currency)
         if not acc or self.need_rotate(acc):
-            logger.info("rotate dual attestation info for  %s" % self.account.account_address)
+            logger.info("rotate dual attestation info for  %s" % self.account.account_address.to_hex())
             self.account.rotate_dual_attestation_info(client, self.server_url)
 
     def need_funds(self, account: jsonrpc.Account) -> bool:
@@ -64,12 +62,17 @@ class AppConfig:
             return True
         return False
 
-    def serve(self, client: jsonrpc.Client, name: str) -> threading.Thread:
-        api: falcon.API = falcon_api(App(self.account, client, name))
-
-        def serve_forever() -> None:
-            waitress.serve(api, host=self.host, port=self.port, clear_untrusted_proxy_headers=True)
-
-        t = threading.Thread(target=serve_forever, daemon=True)
+    def serve(self, api: falcon.API) -> threading.Thread:
+        t = threading.Thread(
+            target=waitress.serve,
+            args=[api],
+            kwargs={
+                "host": self.host,
+                "port": self.port,
+                "clear_untrusted_proxy_headers": True,
+                "_quiet": True,
+            },
+            daemon=True,
+        )
         t.start()
         return t
