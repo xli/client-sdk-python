@@ -22,7 +22,7 @@ def clients(stub_config: AppConfig) -> Clients:
     stub_config.serve(diem_client)
 
     return Clients(
-        target=RestClient(os.environ[TARGET_URL]).with_retry(),
+        target=RestClient(name="target-client", server_url=os.environ[TARGET_URL]).with_retry(),
         stub=stub_config.create_client(),
         diem=diem_client,
     )

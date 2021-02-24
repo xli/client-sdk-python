@@ -6,7 +6,7 @@ from diem import testnet
 from diem.testing.miniwallet import AppConfig
 from diem.testing.suites import envs
 from pathlib import Path
-import json, logging, click, falcon, functools, pytest, os, sys
+import json, logging, click, falcon, functools, pytest, os, sys, re
 
 logging.basicConfig(level=logging.INFO, format="%(name)s [%(asctime)s] %(levelname)s: %(message)s")
 basedir: Path = Path(__file__).resolve().parent.parent
@@ -46,19 +46,20 @@ def start_server(name: str, host: str, port: int, jsonrpc: str, faucet: str) -> 
 
     api.add_sink(openapi, prefix="/openapi.yaml")
 
-    print("%s starting server on %s" % (name, conf.port))
     conf.serve_api(api).join()
 
 
 @click.command()
-@click.option("--target", "-t", default="http://localhost:8889", help="Target mini-wallet application URL.")
+@click.option("--target", "-t", default="http://localhost:8888", help="Target mini-wallet application URL.")
 @click.option("--jsonrpc", "-j", default="http://localhost:8080/v1", help="Diem fullnode JSON-RPC URL.")
 @click.option("--faucet", "-f", default="http://localhost:8000/mint", help="Testnet faucet URL.")
-def test(target: str, jsonrpc: str, faucet: str) -> None:
+@click.option("--pytest-args", default="", help="Additional pytest arguments, split by empty space, e.g. `--pytest-args '-v -s'`.", show_default=False)
+def test(target: str, jsonrpc: str, faucet: str, pytest_args: str) -> None:
     configure_testnet(jsonrpc, faucet)
     os.environ[envs.TARGET_URL] = target
 
-    args = ["--pyargs", "diem.testing.suites", "-s"]
+    args = ["--pyargs", "diem.testing.suites"] + re.compile("\s+").split(pytest_args)
+    print("pytest arguments: %s" % args)
     code = pytest.main(args)
     sys.stdout.flush()
     raise SystemExit(code)

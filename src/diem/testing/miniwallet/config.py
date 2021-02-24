@@ -33,7 +33,7 @@ class AppConfig:
         return "%s://%s:%s" % (self.url_scheme, self.host, self.port)
 
     def create_client(self) -> RestClient:
-        return RestClient(server_url=self.server_url).with_retry()
+        return RestClient(server_url=self.server_url, name="%s-client" % self.name).with_retry()
 
     def setup_account(self, client: jsonrpc.Client) -> None:
         acc = client.get_account(self.account.account_address)
@@ -68,6 +68,7 @@ class AppConfig:
 
     def serve_api(self, api: falcon.API) -> threading.Thread:
         def serve() -> None:
+            self.logger.info("serving at %s:%s" % (self.host, self.port))
             waitress.serve(api, host=self.host, port=self.port, clear_untrusted_proxy_headers=True, _quiet=True)
 
         t = threading.Thread(target=serve, daemon=True)

@@ -11,13 +11,15 @@ from ... import offchain
 import requests, logging, random, string, json, time
 
 
-logger: logging.Logger = logging.getLogger(__name__)
-
-
 @dataclass
 class RestClient:
+    name: str
     server_url: str
     session: requests.Session = field(default_factory=requests.Session)
+    logger: logging.Logger = field(init=False)
+
+    def __post_init__(self):
+        self.logger = logging.getLogger(self.name)
 
     def with_retry(self, retry: Retry = Retry(total=5, connect=5, backoff_factor=0.1)) -> "RestClient":
         self.session.mount(self.server_url, HTTPAdapter(max_retries=retry))
@@ -53,10 +55,10 @@ class RestClient:
 
     def send(self, method: str, path: str, data: Optional[str] = None) -> requests.Response:
         url = "%s/%s" % (self.server_url.rstrip("/"), path.lstrip("/"))
-        logger.info("%s %s: %s" % (method, path, data))
+        self.logger.debug("%s %s: %s" % (method, path, data))
         resp = self.session.request(method=method, url=url.lower(), data=data)
-        logger.info("response status code: %s" % resp.status_code)
-        logger.debug(resp.text)
+        self.logger.debug("response status code: %s" % resp.status_code)
+        self.logger.debug(resp.text)
         resp.raise_for_status()
         return resp
 
@@ -116,15 +118,18 @@ class AccountResource:
     def print_events(self) -> None:
         try:
             events = self.events()
-            print("=== events(len=%s) happend in the account(%s) ===" % (len(events), self.id))
+            self.info("=== events(len=%s) happend in the account(%s) ===" % (len(events), self.id))
             for e in events:
-                print("event[%s] %s:" % (e.id, e.type))
+                self.info("event[%s] %s:" % (e.id, e.type))
                 try:
-                    print(json.dumps(json.loads(e.data), indent=2))
+                    self.info(json.dumps(json.loads(e.data), indent=2))
                 except Exception:
-                    print(e.data)
+                    self.info(e.data)
         except Exception:
             pass
+
+    def info(self, *args: Any, **kwargs: Any) -> None:
+        self.client.logger.info(*args, **kwargs)
 
     def _resources(self, resource: str) -> str:
         return "/accounts/%s/%ss" % (self.id, resource)
