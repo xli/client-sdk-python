@@ -21,7 +21,7 @@ class RestClient:
     def __post_init__(self) -> None:
         self.logger = logging.getLogger(self.name)
 
-    def with_retry(self, retry: Retry = Retry(total=5, connect=5, backoff_factor=0.1)) -> "RestClient":
+    def with_retry(self, retry: Retry = Retry(total=5, connect=5, backoff_factor=0.01)) -> "RestClient":
         self.session.mount(self.server_url, HTTPAdapter(max_retries=retry))
         return self
 
