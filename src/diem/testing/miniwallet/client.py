@@ -18,7 +18,7 @@ class RestClient:
     session: requests.Session = field(default_factory=requests.Session)
     logger: logging.Logger = field(init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.logger = logging.getLogger(self.name)
 
     def with_retry(self, retry: Retry = Retry(total=5, connect=5, backoff_factor=0.1)) -> "RestClient":
@@ -55,10 +55,10 @@ class RestClient:
 
     def send(self, method: str, path: str, data: Optional[str] = None) -> requests.Response:
         url = "%s/%s" % (self.server_url.rstrip("/"), path.lstrip("/"))
-        self.logger.debug("%s %s: %s" % (method, path, data))
+        self.logger.info("%s %s: %s" % (method, path, data))
         resp = self.session.request(method=method, url=url.lower(), data=data)
-        self.logger.debug("response status code: %s" % resp.status_code)
-        self.logger.debug(resp.text)
+        self.logger.info("response status code: %s" % resp.status_code)
+        self.logger.info("response body: %s" % resp.text)
         resp.raise_for_status()
         return resp
 

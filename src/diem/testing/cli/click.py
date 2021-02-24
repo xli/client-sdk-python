@@ -6,9 +6,10 @@ from diem import testnet
 from diem.testing.miniwallet import AppConfig
 from diem.testing.suites import envs
 from pathlib import Path
+from typing import Optional
 import json, logging, click, falcon, functools, pytest, os, sys, re
 
-logging.basicConfig(level=logging.INFO, format="%(name)s [%(asctime)s] %(levelname)s: %(message)s")
+log_format: str = "%(name)s [%(asctime)s] %(levelname)s: %(message)s"
 basedir: Path = Path(__file__).resolve().parent.parent
 
 
@@ -26,7 +27,9 @@ def main() -> None:
 @click.option("--port", "-p", default=8888, help="Start server port.")
 @click.option("--jsonrpc", "-j", default="http://localhost:8080/v1", help="Diem fullnode JSON-RPC URL.")
 @click.option("--faucet", "-f", default="http://localhost:8000/mint", help="Testnet faucet URL.")
-def start_server(name: str, host: str, port: int, jsonrpc: str, faucet: str) -> None:
+@click.option("--logfile", "-l", default=None, help="Log to a file instead of printing into console.")
+def start_server(name: str, host: str, port: int, jsonrpc: str, faucet: str, logfile: Optional[str]) -> None:
+    logging.basicConfig(level=logging.INFO, format=log_format, filename=logfile)
     configure_testnet(jsonrpc, faucet)
 
     conf = AppConfig(name=name, host=host, port=port)
@@ -53,12 +56,17 @@ def start_server(name: str, host: str, port: int, jsonrpc: str, faucet: str) -> 
 @click.option("--target", "-t", default="http://localhost:8888", help="Target mini-wallet application URL.")
 @click.option("--jsonrpc", "-j", default="http://localhost:8080/v1", help="Diem fullnode JSON-RPC URL.")
 @click.option("--faucet", "-f", default="http://localhost:8000/mint", help="Testnet faucet URL.")
-@click.option("--pytest-args", default="", help="Additional pytest arguments, split by empty space, e.g. `--pytest-args '-v -s'`.", show_default=False)
+@click.option(
+    "--pytest-args",
+    default="",
+    help="Additional pytest arguments, split by empty space, e.g. `--pytest-args '-v -s'`.",
+    show_default=False,
+)
 def test(target: str, jsonrpc: str, faucet: str, pytest_args: str) -> None:
     configure_testnet(jsonrpc, faucet)
     os.environ[envs.TARGET_URL] = target
 
-    args = ["--pyargs", "diem.testing.suites"] + [arg for arg in re.compile("\s+").split(pytest_args) if arg]
+    args = ["--pyargs", "diem.testing.suites"] + [arg for arg in re.compile("\\s+").split(pytest_args) if arg]
     print("pytest arguments: %s" % args)
     code = pytest.main(args)
     sys.stdout.flush()

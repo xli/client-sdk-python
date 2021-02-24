@@ -1,18 +1,20 @@
 # Copyright (c) The Diem Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from diem.testing.miniwallet import Account, Transaction
+from diem.testing.miniwallet import Account, Transaction, RestClient
 from diem import identifier
+from typing import Optional, Dict
 from .envs import INCLUDE_DEBUG_API
+from .clients import Clients
 import pytest, requests, time, json, os
 
 
-def test_create_account_resource_without_balance(target_client):
+def test_create_account_resource_without_balance(target_client: RestClient) -> None:
     account = target_client.create_account()
     assert account.balances() == {}
 
 
-def test_create_account_with_kyc_data_and_balances(target_client, currency):
+def test_create_account_with_kyc_data_and_balances(target_client: RestClient, currency: str) -> None:
     kyc_data = target_client.new_kyc_data()
     account = target_client.create_account(kyc_data=kyc_data, balances={currency: 100})
     assert account.id
@@ -20,8 +22,11 @@ def test_create_account_with_kyc_data_and_balances(target_client, currency):
     assert account.balances() == {currency: 100}
     assert account.balance(currency) == 100
 
-@pytest.mark.skipif(os.getenv(INCLUDE_DEBUG_API), reason="env variable %r is not set" % INCLUDE_DEBUG_API)
-def test_create_account_event(target_client, currency):
+
+@pytest.mark.skipif(  # pyre-ignore
+    os.getenv(INCLUDE_DEBUG_API) is not None, reason="env variable %r is not set" % INCLUDE_DEBUG_API
+)
+def test_create_account_event(target_client: RestClient, currency: str) -> None:
     before_timestamp = int(time.time() * 1000)
     account = target_client.create_account()
     after_timestamp = int(time.time() * 1000)
@@ -38,7 +43,7 @@ def test_create_account_event(target_client, currency):
     assert event_data.id == account.id
 
 
-@pytest.mark.parametrize(
+@pytest.mark.parametrize(  # pyre-ignore
     "err_msg, kyc_data, balances",
     [
         ("'kyc_data' is required", None, None),
@@ -50,7 +55,9 @@ def test_create_account_event(target_client, currency):
         ("'amount' type must be 'int'", "sample", {"XUS": "11"}),
     ],
 )
-def test_create_account_with_invalid_data(target_client, currency, err_msg, kyc_data, balances):
+def test_create_account_with_invalid_data(
+    target_client: RestClient, currency: str, err_msg: str, kyc_data: Optional[str], balances: Optional[Dict[str, int]]
+) -> None:
     if kyc_data == "sample":
         kyc_data = target_client.new_kyc_data()
 
@@ -59,7 +66,7 @@ def test_create_account_with_invalid_data(target_client, currency, err_msg, kyc_
     assert err_msg in einfo.value.response.text
 
 
-def test_create_account_payment_uri(target_client, hrp):
+def test_create_account_payment_uri(target_client: RestClient, hrp: str) -> None:
     account = target_client.create_account()
     ret = account.create_payment_uri()
     assert ret.account_id == account.id
@@ -70,15 +77,20 @@ def test_create_account_payment_uri(target_client, hrp):
     assert subaddress
     assert ret.subaddress_hex == subaddress.hex()
 
-@pytest.mark.skipif(os.getenv(INCLUDE_DEBUG_API), reason="env variable %r is not set" % INCLUDE_DEBUG_API)
-def test_create_account_payment_uri_events(target_client, hrp):
+
+@pytest.mark.skipif(  # pyre-ignore
+    os.getenv(INCLUDE_DEBUG_API) is not None, reason="env variable %r is not set" % INCLUDE_DEBUG_API
+)
+def test_create_account_payment_uri_events(target_client: RestClient, hrp: str) -> None:
     account = target_client.create_account()
     index = len(account.events())
     ret = account.create_payment_uri()
+    assert ret
     assert len(account.events(index)) == 1
     assert account.events(index)[0].type == "created_payment_uri"
 
-def test_send_payment_and_events(clients, hrp, currency):
+
+def test_send_payment_and_events(clients: Clients, hrp: str, currency: str) -> None:
     receiver = clients.target.create_account()
     payment_uri = receiver.create_payment_uri()
 
@@ -108,7 +120,7 @@ def test_send_payment_and_events(clients, hrp, currency):
     assert sorted(list(json.loads(new_events[3].data).keys())) == ["diem_transaction_version", "id", "status"]
 
 
-def test_receive_payment_and_events(clients, hrp, currency):
+def test_receive_payment_and_events(clients: Clients, currency: str, hrp: str) -> None:
     receiver = clients.stub.create_account()
     payment_uri = receiver.create_payment_uri()
 
@@ -130,7 +142,7 @@ def test_receive_payment_and_events(clients, hrp, currency):
     assert txn.diem_transaction_version
 
 
-def test_receive_multiple_payments(clients, hrp, currency):
+def test_receive_multiple_payments(clients: Clients, hrp: str, currency: str) -> None:
     receiver = clients.stub.create_account()
     payment_uri = receiver.create_payment_uri()
 
@@ -160,7 +172,7 @@ def test_receive_multiple_payments(clients, hrp, currency):
         "tdm1p7ujcndcl7nudzwt8fglhx6wxnvqqqqqqqqqqqqqv88j4x",
     ],
 )
-def test_send_payment_payee_is_invalid(clients, currency, invalid_payee, hrp):
+def test_send_payment_payee_is_invalid(clients: Clients, currency: str, invalid_payee: str, hrp: str) -> None:
     sender = clients.stub.create_account({currency: 100})
 
     index = len(sender.events())
@@ -171,7 +183,9 @@ def test_send_payment_payee_is_invalid(clients, currency, invalid_payee, hrp):
     assert sender.events(index) == []
 
 
-def test_return_client_error_if_send_payment_more_than_account_balance(clients, currency, hrp):
+def test_return_client_error_if_send_payment_more_than_account_balance(
+    clients: Clients, currency: str, hrp: str
+) -> None:
     receiver = clients.target.create_account()
     payment_uri = receiver.create_payment_uri()
     sender = clients.stub.create_account({currency: 100})
@@ -184,7 +198,9 @@ def test_return_client_error_if_send_payment_more_than_account_balance(clients, 
     assert sender.events(index) == []
 
 
-def test_send_payment_meets_travel_rule_limit(clients, currency, travel_rule_threshold, hrp):
+def test_send_payment_meets_travel_rule_limit(
+    clients: Clients, currency: str, travel_rule_threshold: int, hrp: str
+) -> None:
     amount = travel_rule_threshold
     receiver = clients.target.create_account()
     payment_uri = receiver.create_payment_uri()
@@ -196,7 +212,9 @@ def test_send_payment_meets_travel_rule_limit(clients, currency, travel_rule_thr
     receiver.wait_for_balance(currency, travel_rule_threshold)
 
 
-def test_account_balance_validation_should_exclude_canceled_transactions(clients, currency, travel_rule_threshold, hrp):
+def test_account_balance_validation_should_exclude_canceled_transactions(
+    clients: Clients, currency: str, travel_rule_threshold: int, hrp: str
+) -> None:
     amount = travel_rule_threshold
     receiver = clients.target.create_account()
     payment_uri = receiver.create_payment_uri()
@@ -221,7 +239,7 @@ def test_account_balance_validation_should_exclude_canceled_transactions(clients
         1_000_000_000_000,
     ],
 )
-def test_internal_transfer(clients, currency, amount, hrp):
+def test_internal_transfer(clients: Clients, currency: str, amount: int, hrp: str) -> None:
     receiver = clients.stub.create_account()
     payment_uri = receiver.create_payment_uri()
     sender = clients.stub.create_account({currency: amount})
