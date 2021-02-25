@@ -216,7 +216,7 @@ components:
           type: integer
         payee:
           type: string
-          description: The receiver of the payment, [Account Identifier] or [Diem ID]
+          description: The receiver of the payment, [Account Identifier]
     KycSample:
       description: KYC data sample for clients to create accounts to do off-chain KYC data exchanging tests.
       required:
