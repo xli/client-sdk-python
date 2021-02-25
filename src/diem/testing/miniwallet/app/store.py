@@ -65,11 +65,10 @@ class InMemory:
 
     def _update(self, obj: T) -> None:
         records = self.resources.get(type(obj), [])
-        for i, res in enumerate(records):
-            if res["id"] == obj.id:
-                records[i] = asdict(obj)
-                return
-        raise NotFoundError("could not find resource: %s" % obj)
+        index = next(iter([i for i, res in enumerate(records) if res['id'] == obj.id]), None)
+        if index is None:
+            raise NotFoundError("could not find resource by id: %s" % obj.id)
+        records[index] = asdict(obj)
 
     def _insert(self, typ: Type[T], **res: Any) -> Dict[str, Any]:
         res["id"] = str(self.next_id())
