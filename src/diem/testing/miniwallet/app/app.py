@@ -4,21 +4,21 @@
 from dataclasses import asdict
 from typing import List, Tuple, Dict, Optional, Any
 from json.decoder import JSONDecodeError
-from .store import InMemory, NotFoundError
+from .store import InMemoryStore, NotFoundError
 from .diem_account import DiemAccount
 from .models import PaymentUri, Account, Transaction, Event, KycSample, Payment, PaymentCommand
 from .event_puller import EventPuller
 from .json_input import JsonInput
 from .... import jsonrpc, offchain, utils, LocalAccount, identifier
 from ....offchain import KycDataObject, Status, AbortCode, CommandResponseObject
-import threading, logging
+import threading, logging, os
 
 
 class Base:
     def __init__(self, account: LocalAccount, client: jsonrpc.Client, name: str, logger: logging.Logger) -> None:
         self.logger = logger
         self.diem_account = DiemAccount(account, client)
-        self.store = InMemory()
+        self.store = InMemoryStore()
         self.offchain = offchain.Client(account.account_address, client, account.hrp)
         self.kyc_sample: KycSample = KycSample.gen(name)
         self.event_puller = EventPuller(client=client, store=self.store, hrp=account.hrp)
@@ -123,17 +123,23 @@ class BackgroundTasks(OffChainAPI):
         try:
             self._process_offchain_commands()
             self._send_pending_payments()
+            self.event_puller.fetch(self.event_puller.save_payment_txn)
         except Exception as e:
             self.logger.exception(e)
+            os._exit(-1)
         if threading.main_thread().is_alive():
             threading.Timer(delay, self.start_sync, args=[delay]).start()
 
     def _send_pending_payments(self) -> None:
         for txn in self.store.find_all(Transaction, status=Transaction.Status.pending):
-            if self.offchain.is_my_account_id(str(txn.payee)):
-                self._send_internal_payment_txn(txn)
-            else:
-                self._send_external_payment_txn(txn)
+            try:
+                if self.offchain.is_my_account_id(str(txn.payee)):
+                    self._send_internal_payment_txn(txn)
+                else:
+                    self._send_external_payment_txn(txn)
+            except Exception as e:
+                self.logger.exception(e)
+                self.store.update(txn, status=Transaction.Status.canceled, cancel_reason=str(e))
 
     def _send_internal_payment_txn(self, txn: Transaction) -> None:
         _, payee_subaddress = self.diem_account.account.decode_account_identifier(str(txn.payee))
@@ -153,7 +159,7 @@ class BackgroundTasks(OffChainAPI):
                 diem_txn = self.diem_account.client.wait_for_transaction(str(txn.signed_transaction))
                 self.store.update(txn, status=Transaction.Status.completed, diem_transaction_version=diem_txn.version)
             except jsonrpc.WaitForTransactionTimeout as e:
-                self.store.create_event(txn.account_id, "error", str(e))
+                self.store.create_event(txn.account_id, "info", str(e))
             except jsonrpc.TransactionHashMismatchError as e:
                 self.store.create_event(txn.account_id, "info", str(e))
                 self.store.update(txn, signed_transaction=self.diem_account.submit_p2p(txn, self._txn_metadata(txn)))
@@ -194,15 +200,19 @@ class BackgroundTasks(OffChainAPI):
             self._create_payment_command(txn.account_id, command)
 
     def _process_offchain_commands(self) -> None:
-        cmds = self.store.find_all(PaymentCommand, is_inbound=True, is_abort=False, is_ready=False)
+        cmds = self.store.find_all(PaymentCommand, is_inbound=True, is_abort=False, is_ready=False, process_error=None)
         for cmd in cmds:
-            offchain_cmd = cmd.to_offchain_command()
-            action = offchain_cmd.follow_up_action()
-            if not action:
-                continue
-            new_offchain_cmd = getattr(self, "_offchain_action_%s" % action.value)(cmd.account_id, offchain_cmd)
-            self.offchain.send_command(new_offchain_cmd, self.diem_account.account.compliance_key.sign)
-            self._update_payment_command(cmd, new_offchain_cmd)
+            try:
+                offchain_cmd = cmd.to_offchain_command()
+                action = offchain_cmd.follow_up_action()
+                if not action:
+                    continue
+                new_offchain_cmd = getattr(self, "_offchain_action_%s" % action.value)(cmd.account_id, offchain_cmd)
+                self.offchain.send_command(new_offchain_cmd, self.diem_account.account.compliance_key.sign)
+                self._update_payment_command(cmd, new_offchain_cmd)
+            except Exception as e:
+                self.logger.exception(e)
+                self.store.update(cmd, process_error=str(e))
 
     def _offchain_action_evaluate_kyc_data(self, account_id: str, cmd: offchain.PaymentCommand) -> offchain.Command:
         op_kyc_data = cmd.opponent_actor_obj().kyc_data
@@ -265,7 +275,6 @@ class App(BackgroundTasks):
 
     def get_account_balances(self, account_id: str) -> Dict[str, int]:
         self.store.find(Account, id=account_id)
-        self.event_puller.fetch(self.event_puller.save_payment_txn)
         return self._balances(account_id)
 
     def get_account_events(self, account_id: str) -> List[Event]:

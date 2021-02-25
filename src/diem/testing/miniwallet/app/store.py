@@ -16,8 +16,8 @@ class NotFoundError(ValueError):
 
 
 @dataclass
-class InMemory:
-    """InMemory is a simple in-memory store for all resources"""
+class InMemoryStore:
+    """InMemoryStore is a simple in-memory store for resources"""
 
     resources: Dict[Type[Base], List[Dict[str, Any]]] = field(default_factory=dict)
     resources_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -65,7 +65,7 @@ class InMemory:
 
     def _update(self, obj: T) -> None:
         records = self.resources.get(type(obj), [])
-        index = next(iter([i for i, res in enumerate(records) if res['id'] == obj.id]), None)
+        index = next(iter([i for i, res in enumerate(records) if res["id"] == obj.id]), None)
         if index is None:
             raise NotFoundError("could not find resource by id: %s" % obj.id)
         records[index] = asdict(obj)

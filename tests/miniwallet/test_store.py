@@ -6,7 +6,7 @@ from diem.testing.miniwallet.app import store, PaymentCommand
 
 
 def test_find_all_by_matching_property_values():
-    s = store.InMemory()
+    s = store.InMemoryStore()
     cmd = s.create(
         PaymentCommand, is_sender=True, account_id="1", reference_id="2", cid="3", payment_object={}, is_inbound=True
     )

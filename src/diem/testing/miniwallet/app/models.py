@@ -105,6 +105,7 @@ class PaymentCommand(Base):
     is_inbound: bool = field(default=False)
     is_abort: bool = field(default=False)
     is_ready: bool = field(default=False)
+    process_error: Optional[str] = field(default=None)
 
     def to_offchain_command(self) -> offchain.PaymentCommand:
         payment = offchain.from_dict(self.payment_object, offchain.PaymentObject)

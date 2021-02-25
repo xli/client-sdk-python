@@ -4,7 +4,7 @@
 from copy import copy
 from dataclasses import dataclass, field
 from typing import Dict, Callable, Any
-from .store import InMemory
+from .store import InMemoryStore
 from .models import Transaction, PaymentUri, PaymentCommand
 from .... import jsonrpc, diem_types, txnmetadata
 
@@ -12,7 +12,7 @@ from .... import jsonrpc, diem_types, txnmetadata
 @dataclass
 class EventPuller:
     client: jsonrpc.Client
-    store: InMemory
+    store: InMemoryStore
     hrp: str
     state: Dict[str, int] = field(default_factory=dict)
 
